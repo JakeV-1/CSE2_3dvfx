@@ -266,7 +266,7 @@ BOOL MakeSurface_Resource(const char *name, SurfaceID surf_no)
 // TODO - Inaccurate stack frame
 BOOL MakeSurface_File(const char *name, SurfaceID surf_no)
 {
-	std::string path = gDataPath + '/' + name + ".pbm";
+	std::string path = gDataPath + '/' + name + ".bmp";
 
 	if (!IsEnableBitmap(path.c_str()))
 	{
@@ -357,7 +357,7 @@ BOOL ReloadBitmap_Resource(const char *name, SurfaceID surf_no)
 // TODO - Inaccurate stack frame
 BOOL ReloadBitmap_File(const char *name, SurfaceID surf_no)
 {
-	std::string path = gDataPath + '/' + name + ".pbm";
+	std::string path = gDataPath + '/' + name + ".bmp";
 
 	if (!IsEnableBitmap(path.c_str()))
 	{
@@ -402,32 +402,33 @@ BOOL ReloadBitmap_File(const char *name, SurfaceID surf_no)
 BOOL MakeSurface_Generic(int bxsize, int bysize, SurfaceID surf_no, BOOL bSystem, BOOL bTarget)
 {
 #ifdef FIX_BUGS
-	if (surf_no >= SURFACE_ID_MAX)
+    if (surf_no >= SURFACE_ID_MAX)
 #else
-	if (surf_no > SURFACE_ID_MAX)	// OOPS (should be '>=')
+    if (surf_no > SURFACE_ID_MAX)	// OOPS (should be '>=')
 #endif
-		return FALSE;
+        return FALSE;
 
-	if (surf[surf_no] != NULL)
-		return FALSE;
+    if (surf[surf_no] != NULL){
+        RenderBackend_FreeSurface(surf[surf_no]);
+    }
 
-	surf[surf_no] = RenderBackend_CreateSurface(bxsize * mag, bysize * mag, bTarget);
+    surf[surf_no] = RenderBackend_CreateSurface(bxsize * mag, bysize * mag, bTarget);
 
-	if (surf[surf_no] == NULL)
-		return FALSE;
+    if (surf[surf_no] == NULL)
+        return FALSE;
 
-	surface_metadata[surf_no].type = SURFACE_SOURCE_NONE;
-	surface_metadata[surf_no].width = bxsize;
-	surface_metadata[surf_no].height = bysize;
+    surface_metadata[surf_no].type = SURFACE_SOURCE_NONE;
+    surface_metadata[surf_no].width = bxsize;
+    surface_metadata[surf_no].height = bysize;
 
-	if (bSystem)
-		surface_metadata[surf_no].bSystem = TRUE;
-	else
-		surface_metadata[surf_no].bSystem = FALSE;
+    if (bSystem)
+        surface_metadata[surf_no].bSystem = TRUE;
+    else
+        surface_metadata[surf_no].bSystem = FALSE;
 
-	strcpy(surface_metadata[surf_no].name, "generic");
+    strcpy(surface_metadata[surf_no].name, "generic");
 
-	return TRUE;
+    return TRUE;
 }
 
 void BackupSurface(SurfaceID surf_no, const RECT *rect)
@@ -447,7 +448,89 @@ void BackupSurface(SurfaceID surf_no, const RECT *rect)
 
 	RenderBackend_Blit(framebuffer, &rcSet, surf[surf_no], rcSet.left, rcSet.top, FALSE);
 }
+void PutBitmapInterpolate(const DRECT *rcView, double x, double y, const DRECT *rect, SurfaceID surf_no, SurfaceID white_surf, double scale, int cR, int cG, int cB, float pct)
+{
+    if (surf[surf_no] == NULL)
+        return;
 
+    static RenderBackend_DRect rcWork;
+
+    rcWork.left = rect->left;
+    rcWork.top = rect->top;
+    rcWork.right = rect->right;
+    rcWork.bottom = rect->bottom;
+
+    if (x + rect->right - rect->left > rcView->right)
+        rcWork.right -= (x + rect->right - rect->left) - rcView->right;
+
+    if (x < rcView->left)
+    {
+        rcWork.left += rcView->left - x;
+        x = rcView->left;
+    }
+
+    if (y + rect->bottom - rect->top > rcView->bottom)
+        rcWork.bottom -= (y + rect->bottom - rect->top) - rcView->bottom;
+
+    if (y < rcView->top)
+    {
+        rcWork.top += rcView->top - y;
+        y = rcView->top;
+    }
+
+    rcWork.left *= mag;
+    rcWork.top *= mag;
+    rcWork.right *= mag;
+    rcWork.bottom *= mag;
+
+
+    // Do not draw invalid RECTs
+    if (rcWork.right <= rcWork.left || rcWork.bottom <= rcWork.top)
+        return;
+
+    RenderBackend_BlitInterpolate(surf[surf_no], surf[white_surf], &rcWork, framebuffer, x * mag, y * mag, scale, cR, cG, cB, pct);
+}
+void PutBitmapEx(const DRECT *rcView, double x, double y, const DRECT *rect, SurfaceID surf_no, double scale, int cR, int cG, int cB) // Transparency
+{
+    if (surf[surf_no] == NULL)
+        return;
+
+    static RenderBackend_DRect rcWork;
+
+    rcWork.left = rect->left;
+    rcWork.top = rect->top;
+    rcWork.right = rect->right;
+    rcWork.bottom = rect->bottom;
+
+    if (x + rect->right - rect->left > rcView->right)
+        rcWork.right -= (x + rect->right - rect->left) - rcView->right;
+
+    if (x < rcView->left)
+    {
+        rcWork.left += rcView->left - x;
+        x = rcView->left;
+    }
+
+    if (y + rect->bottom - rect->top > rcView->bottom)
+        rcWork.bottom -= (y + rect->bottom - rect->top) - rcView->bottom;
+
+    if (y < rcView->top)
+    {
+        rcWork.top += rcView->top - y;
+        y = rcView->top;
+    }
+
+    rcWork.left *= mag;
+    rcWork.top *= mag;
+    rcWork.right *= mag;
+    rcWork.bottom *= mag;
+
+    // Do not draw invalid RECTs
+    if (rcWork.right <= rcWork.left || rcWork.bottom <= rcWork.top)
+        return;
+
+    RenderBackend_BlitEx(surf[surf_no], &rcWork, framebuffer, x * mag, y * mag, TRUE, scale, cR, cG, cB);
+}
 void PutBitmap3(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID surf_no) // Transparency
 {
 	if (surf[surf_no] == NULL)
@@ -550,7 +633,13 @@ void Surface2Surface(int x, int y, const RECT *rect, SurfaceID to, SurfaceID fro
 
 	RenderBackend_Blit(surf[from], &rcWork, surf[to], x * mag, y * mag, TRUE);
 }
+void MakeEveryPixelWhiteExceptThoseThatHaveAlphaZero(SurfaceID to)
+{
+    if (surf[to] == NULL)
+        return;
 
+    RenderBackend_MakeEveryPixelWhiteExceptTheOnesThatHaveAlphaEqualsZero(surf[to]);
+}
 unsigned long GetCortBoxColor(unsigned long col)
 {
 	// Comes in 00BBGGRR, goes out 00BBGGRR
@@ -761,4 +850,7 @@ void PutText2(int x, int y, const char *text, unsigned long color, SurfaceID sur
 void EndTextObject(void)
 {
 	UnloadFont(font);
+}
+void ClearTexture(SurfaceID sur){
+    RenderBackend_ClearTexture(surf[sur]);
 }

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <cmath>
 
 #include "SDL.h"
 
@@ -62,6 +63,80 @@ static void RectToSDLRect(const RenderBackend_Rect *rect, SDL_Rect *sdl_rect)
 		sdl_rect->h = 0;
 }
 
+static void DRectToSDLRect(const RenderBackend_DRect *rect, SDL_Rect *sdl_rect)
+{
+    sdl_rect->x = std::lround(rect->left);
+    sdl_rect->y = std::lround(rect->top);
+    sdl_rect->w = std::lround(rect->right - rect->left);
+    sdl_rect->h = std::lround(rect->bottom - rect->top);
+
+    if (sdl_rect->w < 0)
+        sdl_rect->w = 0;
+
+    if (sdl_rect->h < 0)
+        sdl_rect->h = 0;
+}
+
+SDL_Texture* color_scratch;
+void RenderBackend_BlitInterpolate(RenderBackend_Surface *source_surface, RenderBackend_Surface *white_surface,const RenderBackend_DRect *rect, RenderBackend_Surface *destination_surface, double x, double y, double scale, int cR, int cG, int cB, float pct)
+{
+
+    SDL_Rect source_rect;
+    DRectToSDLRect(rect, &source_rect);
+
+    SDL_Rect destination_rect = {std::lround(x), std::lround(y), static_cast<int>(std::lround(source_rect.w*scale)) + 2, static_cast<int>(std::lround(source_rect.h*scale)) + 2};
+
+    SDL_SetTextureScaleMode(source_surface->texture, SDL_ScaleModeNearest);
+
+    SDL_SetTextureAlphaMod(white_surface->texture, pct*255);
+    SDL_SetTextureColorMod(white_surface->texture, cR, cG, cB);
+    SDL_SetTextureBlendMode(white_surface->texture, SDL_BLENDMODE_BLEND);
+
+
+    if (SDL_SetRenderTarget(renderer, destination_surface->texture) < 0)
+        Backend_PrintError("Couldn't set current rendering target: %s", SDL_GetError());
+
+    if (SDL_RenderCopy(renderer, source_surface->texture, &source_rect, &destination_rect) < 0)
+        Backend_PrintError("Couldn't copy part of texture to rendering target: %s", SDL_GetError());
+//    if (SDL_RenderCopy(renderer, white_surface->texture, NULL, NULL) < 0)
+    if (SDL_RenderCopy(renderer, white_surface->texture, &source_rect, &destination_rect) < 0)
+        Backend_PrintError("Couldn't copy part of texture to rendering target: %s", SDL_GetError());
+}
+
+void RenderBackend_BlitEx(RenderBackend_Surface *source_surface, const RenderBackend_DRect *rect, RenderBackend_Surface *destination_surface, double x, double y, bool colour_key, double scale, int cR, int cG, int cB)
+{
+    SDL_Rect source_rect;
+    DRectToSDLRect(rect, &source_rect);
+
+    SDL_Rect destination_rect = {std::lround(x), std::lround(y), static_cast<int>(std::lround(source_rect.w*scale)) + 2, static_cast<int>(std::lround(source_rect.h*scale)) + 2};
+
+
+    // Blit the texture
+    if (SDL_SetTextureBlendMode(source_surface->texture, SDL_BLENDMODE_BLEND) < 0)
+        Backend_PrintError("Couldn't set texture blend mode: %s", SDL_GetError());
+
+    SDL_SetTextureColorMod(source_surface->texture, cR,cG,cB);
+
+    if (SDL_SetRenderTarget(renderer, destination_surface->texture) < 0)
+        Backend_PrintError("Couldn't set current rendering target: %s", SDL_GetError());
+
+    if (SDL_RenderCopy(renderer, source_surface->texture, &source_rect, &destination_rect) < 0)
+        Backend_PrintError("Couldn't copy part of texture to rendering target: %s", SDL_GetError());
+}
+void RenderBackend_MakeEveryPixelWhiteExceptTheOnesThatHaveAlphaEqualsZero(RenderBackend_Surface *surf){
+    if(color_scratch == NULL){
+        color_scratch = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, framebuffer.width, framebuffer.height);
+        SDL_SetRenderTarget(renderer, color_scratch);
+        SDL_SetRenderDrawColor(renderer, 255,255,255,255);
+        SDL_RenderClear(renderer);
+        SDL_SetRenderTarget(renderer, framebuffer.texture);
+    }
+
+    SDL_SetTextureBlendMode(color_scratch, SDL_BLENDMODE_ADD);
+    SDL_SetRenderTarget(renderer, surf->texture);
+    SDL_RenderCopy(renderer, color_scratch, NULL, NULL);
+    SDL_SetRenderTarget(renderer, framebuffer.texture);
+}
 RenderBackend_Surface* RenderBackend_Init(const char *window_title, size_t screen_width, size_t screen_height, bool fullscreen)
 {
 	Backend_PrintInfo("Available SDL render drivers:");
@@ -175,33 +250,33 @@ void RenderBackend_DrawScreen(void)
 
 RenderBackend_Surface* RenderBackend_CreateSurface(size_t width, size_t height, bool render_target)
 {
-	RenderBackend_Surface *surface = (RenderBackend_Surface*)malloc(sizeof(RenderBackend_Surface));
+    RenderBackend_Surface *surface = (RenderBackend_Surface*)malloc(sizeof(RenderBackend_Surface));
 
-	if (surface == NULL)
-		return NULL;
+    if (surface == NULL)
+        return NULL;
 
-	surface->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, render_target ? SDL_TEXTUREACCESS_TARGET : SDL_TEXTUREACCESS_STATIC, width, height);
+    surface->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, width, height);
 
-	if (surface->texture == NULL)
-	{
-		free(surface);
-		return NULL;
-	}
+    if (surface->texture == NULL)
+    {
+        free(surface);
+        return NULL;
+    }
 
-	surface->width = width;
-	surface->height = height;
-	surface->render_target = render_target;
-	surface->lost = false;
+    surface->width = width;
+    surface->height = height;
+    surface->render_target = render_target;
+    surface->lost = false;
 
-	// Add to linked-list
-	surface->prev = NULL;
-	surface->next = surface_list_head;
-	surface_list_head = surface;
+    // Add to linked-list
+    surface->prev = NULL;
+    surface->next = surface_list_head;
+    surface_list_head = surface;
 
-	if (surface->next != NULL)
-		surface->next->prev = surface;
+    if (surface->next != NULL)
+        surface->next->prev = surface;
 
-	return surface;
+    return surface;
 }
 
 void RenderBackend_FreeSurface(RenderBackend_Surface *surface)
@@ -418,7 +493,12 @@ void RenderBackend_HandleRenderTargetLoss(void)
 		if (surface->render_target)
 			surface->lost = true;
 }
-
+void RenderBackend_ClearTexture(RenderBackend_Surface *surface){
+    SDL_SetRenderTarget(renderer, surface->texture);
+    SDL_SetRenderDrawColor(renderer, 0,0,0,0);
+    SDL_RenderClear(renderer);
+    SDL_SetRenderTarget(renderer, framebuffer.texture);
+}
 void RenderBackend_HandleWindowResize(size_t width, size_t height)
 {
 	size_t upscale_factor = MAX(1, MIN((width + framebuffer.width / 2) / framebuffer.width, (height + framebuffer.height / 2) / framebuffer.height));

@@ -146,6 +146,7 @@ static const char* const extra_text = "(C)Pixel";
 
 BOOL IsEnableBitmap(const char *path)
 {
+    return TRUE;
 	FILE *fp;
 	long len;
 	char str[16];

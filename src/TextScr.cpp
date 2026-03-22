@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <cmath>
 
 #include "WindowsWrapper.h"
 
@@ -228,7 +229,51 @@ std::string GetTextScriptPath(void)
 {
 	return gTS.path;
 }
+double CalcLayerStartPercentSoMainLayerDrawsAtLayerFX1(int main_layer){
+    int main_layer_depth = 0;
+    for (int i = 0; i < main_layer; ++i) {
+        // Iterate through all layers exept the main layer
+        main_layer_depth += gMap.layer_depth[i];
+    }
+    // We want our main layer to be drawn a little bit behind the player so its centered
+    main_layer_depth += gMap.layer_depth[main_layer] / 2;
+    main_layer_depth-=1;
 
+    // Starting at 100% layer depth, do the opposite of what background layer drawing does to find the start percentage
+    /*
+     * Formula: i+=0.01*(i*i)
+     * So, formula for i at a specific iteration based on the previous iteration:
+     *   i = x + kx^2    | Where i = current iteration, x = previous iteration, k = 0.01 (or layer slice in the future)
+     *  We need the formula for x (i_previous in a given iteration to work backward)
+     *   kx^2 + x - i = 0
+     *  Use quadratic formula on x
+     *   x = -1 + sqrt(1+4ki) / 2k
+     */
+    double iteration = 0.9999999;
+    double k = 0.01;
+    for (int zz = 0; zz < main_layer_depth; ++zz) {
+        // Apply previous formula to get the "previous" iterations i
+        double x = (-1.0 + std::sqrt(1.0 + (4 * k * iteration))) / (2*k);
+        iteration = x;
+    }
+
+    int drawn_layer_count = 0;
+    int drawn_current_layer_count = 0;
+    for (double i = iteration; i < 1; i+=0.01*(i*i)) {//*(i*i) // i*i approximates depth-corrected layer seperation
+        int depth = gMap.layer_depth[drawn_layer_count];
+        if (drawn_current_layer_count++ >= depth) {
+            drawn_layer_count++;
+            drawn_current_layer_count = 1; // (we'll draw below)
+        }
+    }
+
+    // that's our layer start percentage
+    return iteration;
+
+    // chatGPT's differential equation solution approximation... seems to be about the same
+    //return 1.0 / (1.0 + 0.01 * main_layer_depth);
+
+}
 // Get 4 digit number from TSC data
 int GetTextScriptNo(int a)
 {
@@ -751,7 +796,7 @@ int TextScriptProc(void)
 						#if !defined(JAPANESE) && defined(FIX_BUGS) // The Aeon Genesis translation didn't translate this
 							Backend_ShowMessageBox("Error", "Failed to load stage");
 						#else
-							Backend_ShowMessageBox("エラー", "ステージの読み込みに失敗");
+							Backend_ShowMessageBox("エラー", "Failed to load stage");
 						#endif
 							return enum_ESCRETURN_exit;
 						}
@@ -1188,6 +1233,41 @@ int TextScriptProc(void)
 						SetNpChar(w, x * 0x200 * 0x10, y * 0x200 * 0x10, 0, 0, z, NULL, 0x100);
 						gTS.p_read += 23;
 					}
+                    else if (IS_COMMAND('S','B','C'))
+                    {
+                        //SBC
+                        fog_r = GetTextScriptNo(gTS.p_read + 4); // Fog RGB
+                        fog_g = GetTextScriptNo(gTS.p_read + 9);
+                        fog_b = GetTextScriptNo(gTS.p_read + 14);
+                        // Where in the background to start the drawing
+                        LAYER_START_PCT = static_cast<double >(GetTextScriptNo(gTS.p_read + 19)) / 1000.0;
+                        // If we are a loaded PXL... we need to dynamically calculate start_pct instead
+                        if(gMap.main_layer != -1){
+                            LAYER_START_PCT = CalcLayerStartPercentSoMainLayerDrawsAtLayerFX1(gMap.main_layer);
+                        }
+                        gTS.p_read += 23;
+                    }else if (IS_COMMAND('S','B','2'))
+                    {
+                        //SB2
+                        // Ignored on i9
+                        LAYER_END_PCT = static_cast<double>(GetTextScriptNo(gTS.p_read + 4)) / 1000.0;
+                        // Fog start and end
+                        FOG_START = static_cast<double>(GetTextScriptNo(gTS.p_read + 9)) / 1000.0;
+                        FOG_END = static_cast<double>(GetTextScriptNo(gTS.p_read + 14)) / 1000.0;
+                        z = GetTextScriptNo(gTS.p_read + 19);
+                        if(z == 0){
+                            LAYER_SPACING = 0.01;
+                        }else{
+                            LAYER_SPACING = static_cast<double >(z) / 1000.0;
+                        }
+
+
+                        // Recalculate start percent because its dependent on layer spacing
+                        if(gMap.main_layer != -1){
+                            LAYER_START_PCT = CalcLayerStartPercentSoMainLayerDrawsAtLayerFX1(gMap.main_layer);
+                        }
+                        gTS.p_read += 23;
+                    }
 					else if (IS_COMMAND('M','N','P'))
 					{
 						w = GetTextScriptNo(gTS.p_read + 4);

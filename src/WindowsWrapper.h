@@ -21,3 +21,11 @@ struct RECT
 	long right;
 	long bottom;
 };
+
+struct DRECT
+{
+    double left;
+    double top;
+    double right;
+    double bottom;
+};

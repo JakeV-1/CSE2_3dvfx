@@ -256,7 +256,7 @@ BOOL InitializeGame(void)
 	#if !defined(JAPANESE) && defined(FIX_BUGS) // The Aeon Genesis translation didn't translate this
 		Backend_ShowMessageBox("Error", "Failed to load stage");
 	#else
-		Backend_ShowMessageBox("エラー", "ステージの読み込みに失敗");
+		Backend_ShowMessageBox("エラー", "Failed to load stage");
 	#endif
 		return FALSE;
 	}

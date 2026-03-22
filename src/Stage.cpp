@@ -51,7 +51,7 @@ const STAGE_TABLE gTMT[] = {
 	STAGE_ENTRY("Sand",   "Sand",   BACKGROUND_TYPE_MOVE_DISTANT, "bkGreen", "Sand",   "Omg",    1, "Sand Zone",             "\x8D\xBB\x8B\xE6"),	/* 砂区 */
 	STAGE_ENTRY("Mimi",   "Mimi",   BACKGROUND_TYPE_MOVE_DISTANT, "bkBlue",  "Guest",  "0",      0, "Mimiga Village",        "\x83\x7E\x83\x7E\x83\x4B\x81\x5B\x82\xCC\x91\xBA"),	/* ミミガーの村 */
 	STAGE_ENTRY("Cave",   "Cave",   BACKGROUND_TYPE_BLACK,        "bk0",     "Cemet",  "0",      0, "First Cave",            "\x8D\xC5\x8F\x89\x82\xCC\x93\xB4\x8C\x41"),	/* 最初の洞窟 */
-	STAGE_ENTRY("Cave",   "Start",  BACKGROUND_TYPE_BLACK,        "bk0",     "Cemet",  "0",      0, "Start Point",           "\x83\x58\x83\x5E\x81\x5B\x83\x67\x92\x6E\x93\x5F"),	/* スタート地点 */
+	STAGE_ENTRY("Almond",   "Start",  BACKGROUND_TYPE_BLACK,        "bk0",     "Cemet",  "0",      0, "Start Point",           "\x83\x58\x83\x5E\x81\x5B\x83\x67\x92\x6E\x93\x5F"),	/* スタート地点 */
 	STAGE_ENTRY("Mimi",   "Barr",   BACKGROUND_TYPE_BLACK,        "bk0",     "Cemet",  "Bllg",   0, "Shack",                 "\x83\x6F\x83\x89\x83\x62\x83\x4E\x8F\xAC\x89\xAE"),	/* バラック小屋 */
 	STAGE_ENTRY("Mimi",   "Pool",   BACKGROUND_TYPE_MOVE_DISTANT, "bkBlue",  "Guest",  "0",      0, "Reservoir",             "\x92\x99\x90\x85\x92\x72"),	/* 貯水池 */
 	STAGE_ENTRY("Mimi",   "Cemet",  BACKGROUND_TYPE_BLACK,        "bk0",     "Cemet",  "0",      0, "Graveyard",             "\x82\xCD\x82\xA9\x82\xCE"),	/* はかば */
@@ -137,6 +137,14 @@ const STAGE_TABLE gTMT[] = {
 
 BOOL TransferStage(int no, int w, int x, int y)
 {
+    LAYER_START_PCT = 0;
+    FOG_START = 0.1;
+    FOG_END = 0;
+
+    fog_r = 0;
+    fog_g = 0;
+    fog_b = 0x10;
+
 	std::string path;
 	std::string path_dir;
 	BOOL bError;

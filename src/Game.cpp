@@ -592,17 +592,101 @@ static int ModeAction(void)
 		CortBox(&grcFull, color);
 		GetFramePosition(&frame_x, &frame_y);
 		PutBack(frame_x, frame_y);
-		PutStage_Back(frame_x, frame_y);
+
+        int drawn_layer_count = 0;
+        int drawn_current_layer_count = 0;
+        bool is2dMap = gMap.main_layer == -1;
+        bool isI8StyleMap = LAYER_START_PCT > 0.001 && is2dMap;
+#define DEPTH_OPTIMIZATION true
+        if(isI8StyleMap){
+            double last_drawn_layerfx = 0;
+            for (double i = LAYER_START_PCT; i < 1; i+=LAYER_SPACING*(i*i)) {
+                if(DEPTH_OPTIMIZATION && i - last_drawn_layerfx < 0.004){
+                    continue;
+                }else{
+                    last_drawn_layerfx = i;
+                    // Update and draw
+                    if(gMap.image_data[drawn_layer_count] != -1){
+                        PutStage_BKG(frame_x, frame_y, i, 0);
+                    }
+                }
+            }
+        }else if(LAYER_START_PCT > 0.001){
+            double last_drawn_layerfx = 0;
+            for (double i = LAYER_START_PCT; i < 1; i+=0.01*(i*i)) {//*(i*i) // i*i approximates depth-corrected layer seperation
+                int depth = gMap.layer_depth[drawn_layer_count];
+                if(drawn_current_layer_count++ >= depth){
+                    drawn_layer_count++;
+                    drawn_current_layer_count = 1; // (we'll draw below)
+                }
+
+                // Case that should never happen
+                if(drawn_layer_count >= 512){
+                    break;
+                }
+
+                // Do not draw layers _too_ close together
+                if(DEPTH_OPTIMIZATION && i - last_drawn_layerfx < 0.004){
+                    continue;
+                }else{
+                    last_drawn_layerfx = i;
+                    // Update and draw
+                    if(gMap.image_data[drawn_layer_count] != -1){
+                        PutStage_BKG(frame_x, frame_y, i, drawn_layer_count);
+                    }
+                }
+            }
+
+            // For our last iteration, we are going to want to draw the main layer at layerfx=1
+            int depth = gMap.layer_depth[drawn_layer_count];
+            if(drawn_current_layer_count++ >= depth){
+                drawn_layer_count++;
+                drawn_current_layer_count = 1; // (we'll draw below)
+            }
+            gMap.data = gMap.full_data[drawn_layer_count];
+            PutStage_Back(frame_x, frame_y);
+            PutStage_Front(frame_x, frame_y);
+        }
+
+        if(is2dMap){
+            PutStage_Back(frame_x, frame_y);
+        }
 		PutBossChar(frame_x, frame_y);
 		PutNpChar(frame_x, frame_y);
 		PutBullet(frame_x, frame_y);
 		PutMyChar(frame_x, frame_y);
 		PutStar(frame_x, frame_y);
-		PutMapDataVector(frame_x, frame_y);
-		PutStage_Front(frame_x, frame_y);
-		PutFront(frame_x, frame_y);
-		PutFlash();
-		PutCaret(frame_x, frame_y);
+        PutMapDataVector(frame_x, frame_y);
+        if(is2dMap){
+            PutStage_Front(frame_x, frame_y);
+        }
+        PutFront(frame_x, frame_y);
+        PutFlash();
+        PutCaret(frame_x, frame_y);
+        if(isI8StyleMap){
+            for (double i = 1; i < LAYER_END_PCT; i+=LAYER_SPACING) {//*(i*i)
+                PutStage_BKG(frame_x, frame_y, i, 0);
+            }
+        }else if(LAYER_START_PCT > 0.001){ // Layer End PCT is ignored on i9
+            double layer_incr = 0.01;
+            for (double i = 1+layer_incr; i < 2; i+=layer_incr) {//*(i*i) //2 means 'until break';
+                int depth = gMap.layer_depth[drawn_layer_count];
+                if(drawn_current_layer_count++ >= depth){
+                    drawn_layer_count++;
+                    drawn_current_layer_count = 1;
+                    if(drawn_layer_count >= 512){
+                        break;
+                    }
+                }
+                if(drawn_layer_count >= 512){
+                    //fucked up
+                    break;
+                }
+                if(gMap.image_data[drawn_layer_count] != -1) {
+                    PutStage_BKG(frame_x, frame_y, i, drawn_layer_count);
+                }
+            }
+        }
 		PutValueView(frame_x, frame_y);
 		PutBossLife();
 		PutFade();

@@ -45,7 +45,9 @@ typedef enum SurfaceID
 	SURFACE_ID_CREDIT_CAST = 35,
 	SURFACE_ID_CREDITS_IMAGE = 36,
 	SURFACE_ID_CASTS = 37,
-	SURFACE_ID_MAX = 40
+    SURFACE_ID_MAP_IMG = 40,
+    SURFACE_ID_MAP_IMG_WHITE = 41,
+    SURFACE_ID_MAX = 300
 } SurfaceID;
 
 BOOL Flip_SystemTask(void);
@@ -62,6 +64,7 @@ void PutBitmap3(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID su
 void PutBitmap4(const RECT *rcView, int x, int y, const RECT *rect, SurfaceID surf_no);
 void Surface2Surface(int x, int y, const RECT *rect, SurfaceID to, SurfaceID from);
 unsigned long GetCortBoxColor(unsigned long col);
+void MakeEveryPixelWhiteExceptThoseThatHaveAlphaZero(SurfaceID to);
 void CortBox(const RECT *rect, unsigned long col);
 void CortBox2(const RECT *rect, unsigned long col, SurfaceID surf_no);
 int RestoreSurfaces(void);
@@ -69,3 +72,7 @@ void InitTextObject(const char *font_name);
 void PutText(int x, int y, const char *text, unsigned long color);
 void PutText2(int x, int y, const char *text, unsigned long color, SurfaceID surf_no);
 void EndTextObject(void);
+
+void PutBitmapInterpolate(const DRECT *rcView, double x, double y, const DRECT *rect, SurfaceID surf_no, SurfaceID white_surf, double scale, int cR, int cG, int cB, float pct);
+void PutBitmapEx(const DRECT *rcView, double x, double y, const DRECT *rect, SurfaceID surf_no, double scale, int cR, int cG, int cB);
+void ClearTexture(SurfaceID sur);

@@ -11,10 +11,14 @@
 
 typedef struct MAP_DATA
 {
-	unsigned char *data;
-	unsigned char atrb[0x100];
-	short width;
-	short length;
+    unsigned char *data;
+    unsigned char *full_data[512];
+    unsigned short layer_depth[512];
+    int image_data[512];
+    unsigned char atrb[0x100];
+    short width;
+    short length;
+    int main_layer;
 } MAP_DATA;
 
 extern MAP_DATA gMap;
@@ -32,3 +36,10 @@ BOOL ChangeMapParts(int x, int y, unsigned char no);
 void PutStage_Back(int fx, int fy);
 void PutStage_Front(int fx, int fy);
 void PutMapDataVector(int fx, int fy);
+void PutStage_BKG(int fx, int fy, double layerfx, int layer_no);
+extern double LAYER_START_PCT;
+extern double LAYER_END_PCT;
+extern double FOG_START;
+extern double FOG_END;
+extern double LAYER_SPACING;
+extern int fog_r, fog_g, fog_b;
